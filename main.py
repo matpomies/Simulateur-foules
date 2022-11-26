@@ -1,33 +1,65 @@
 import sys, pygame
 from random import randrange
 
-print("Mode emploi (touches) :\n(p) : Mode edition\n(o) : Ajout obstacle\n(s) : Ajout sortie\n(n): Sauvegarde")
+#Print a refaire correctement
+print("Mode emploi (touches) :\n(p) : Mode edition\n(o) : Ajout obstacle\n(s) : Ajout sortie\n(f): Ajout foule\n(n): Sauvegarde")
 
-###Mise en forme globale de l'application###
+
+########Mise en forme globale de l'application###########
 pygame.init()
 size = width, hight = 800, 500
 screen = pygame.display.set_mode(size)
 cellules_hauteur = 25 #Nombre de cellules en hauteur
 cellules_largeur = 40 #Nombre de cellules en largeur
-couleur_obstacle = (80, 80, 80) #Gris
-couleur_sortie = (52, 201, 36) #Vert
-dico_carte = {} #A l'ouverture du programme il sera chargé en fonction du slot choisi
+dico_carte = {} #Ce dictionnaire contient les informations de toutes les cellules et de leur état
+#slot = "Slot_modification.txt" #Permet de charger des cellules deja predefinies
 slot = "Slot2.txt"
 
+#Couleurs
+#https://web-color.aliasdmc.fr/couleur-web-red-rgb-hsl-hexa.html  #Site utilisé pour les couleurs de rouge
+couleur_obstacle = (80, 80, 80) #Gris
+couleur_sortie = (52, 201, 36) #Vert
+couleur_foule1 = (240,128,128) #rouge très clair
+couleur_foule2 = (205,92,92) #rouge clair
+couleur_foule3 = (220,20,60) #rouge moyen
+couleur_foule4 = (255,0,0) #rouge vif
+couleur_foule5 = (139,0,0) #rouge sombre
 
-#Mode edition
+#Parametres foules
+portee_ajout_foule = 4
+##############################
+
+
+#Mode edition, ce dictionnaire contient tous les etats actuels du mode edition
 bool_edition = {
     'edition': False,
     'obstacle': False,
     'sortie': False,
+    'foule': False
 }
 
+def valeur_absolu(k):
+    if k>=0:
+        return k
+    return -k
 
 def str_to_tuple(str):
+    """Permet de convertir un tuple sous forme de string en reel tuple"""
     mont = str[1:len(str) - 1] # on enleve les ()
     return tuple(map(int, mont.split(', '))) #On separe les deux nombres et on les convertis en int, puis en tuple
 
+def ajout_foule(i, j):
+    """Cette fonction s'occupe de repartir la foule sur le point mentionné lors du mode edition"""
+    for k in range(-portee_ajout_foule + 1 ,portee_ajout_foule):
+        for l in range(-portee_ajout_foule + 1 ,portee_ajout_foule):
+            if (i+k, j+l) not in dico_carte:
+                if randrange(0,valeur_absolu(k)+1) == 0:
+                    dico_carte[(i+k, j+l)] = "F"
+            elif dico_carte[(i+k, j+l)] == "F":
+                print("", end='') # Pour l'instant rien, on va rajouter les niveaux de foule après
+
 def enregistrer_carte(dico):
+    """Enregistre l'etat de toutes les cellules de la carte dans un fichier temporaire"""
     fichier = open("Slot_modification.txt", 'w')
     fichier.write(f"Size_window={width};{hight}")
     fichier.write(f"\nSize_tiles={cellules_largeur};{cellules_hauteur}")
@@ -37,6 +69,7 @@ def enregistrer_carte(dico):
 
 
 def ouvrir_carte():
+    """Charge le dictionnaire en charge des cellules depuis un fichier slot.txt"""
     fichier = open(f"{slot}", 'r')
     for ligne in fichier:
         ligne = ligne.rstrip('\n')
@@ -55,13 +88,17 @@ def ouvrir_carte():
             dico_carte[str_to_tuple(ligne[0])] = str(ligne[1])
     fichier.close()
 
+
 def modifier_carreau(x, y):
+    "Cette fonction sert a éditer les cellules de la carte pendant le mode edition"
     j = (cellules_largeur*x)//width # Colonne de la carte
     i = (cellules_hauteur*y)//hight # Ligne de la carte
     if bool_edition['obstacle'] is True:
         dico_carte[(i, j)] = 'O'
     elif bool_edition['sortie'] is True:
         dico_carte[(i, j)] = 'S'
+    elif bool_edition['foule'] is True:
+        ajout_foule(i,j)
     else:
         if (i, j) in dico_carte:
             del(dico_carte[(i, j)])
@@ -75,6 +112,7 @@ def edition(lettre):
         111: 'obstacle', #lettre o
         112: 'edition', #lettre p
         115: 'sortie', #lettre s
+        102: 'foule' #lettre f
         }
 
     if lettre == 112: #Cette partie permet d'activer ou de desactiver le mode edition
@@ -116,7 +154,7 @@ while 1:
             #print(event)
             if event.key == 27:
                 sys.exit()
-            if event.key == 112 or event.key == 115 or event.key == 111:
+            if event.key == 112 or event.key == 115 or event.key == 111 or event.key == 102:
                 edition(event.key)
             if event.key == 110:
                 print("Sauvegarde!")
@@ -130,13 +168,16 @@ while 1:
     taille_largeur = size[0]/cellules_largeur
     taille_hauteur = size[1]/cellules_hauteur
 
+    #Affichage des cellules sur l'application avec leur couleur respective
     for i in range(0, cellules_largeur):
         for j in range(0, cellules_hauteur):
-            if (j, i) in dico_carte:
+            if (j, i) in dico_carte: #Regarde si c'est une cellule vide ou si son état est connu
                 if dico_carte[(j,i)] == 'S':
                     couleur = couleur_sortie
                 elif dico_carte[(j,i)] == 'O':
                     couleur = couleur_obstacle
+                elif dico_carte[(j,i)] == 'F':
+                    couleur = couleur_foule4
                 else:
                     print("Probleme de couleur dans le dictionnaire de la carte")
                 pygame.draw.rect(screen, couleur, pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
