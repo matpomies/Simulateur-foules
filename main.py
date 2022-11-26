@@ -13,20 +13,20 @@ cellules_hauteur = 25 #Nombre de cellules en hauteur
 cellules_largeur = 40 #Nombre de cellules en largeur
 dico_carte = {} #Ce dictionnaire contient les informations de toutes les cellules et de leur état
 #slot = "Slot_modification.txt" #Permet de charger des cellules deja predefinies
-slot = "Slot2.txt"
+slot = "Slot1.txt"
 
 #Couleurs
 #https://web-color.aliasdmc.fr/couleur-web-red-rgb-hsl-hexa.html  #Site utilisé pour les couleurs de rouge
 couleur_obstacle = (80, 80, 80) #Gris
 couleur_sortie = (52, 201, 36) #Vert
-couleur_foule1 = (240,128,128) #rouge très clair
-couleur_foule2 = (205,92,92) #rouge clair
-couleur_foule3 = (220,20,60) #rouge moyen
-couleur_foule4 = (255,0,0) #rouge vif
-couleur_foule5 = (139,0,0) #rouge sombre
+couleur_foule0 = (240,128,128) #rouge très clair
+couleur_foule1 = (205,92,92) #rouge clair
+couleur_foule2 = (220,20,60) #rouge moyen
+couleur_foule3 = (178,34,34) #rouge vif
+couleur_foule4 = (139,0,0) #rouge sombre
 
 #Parametres foules
-portee_ajout_foule = 4
+portee_ajout_foule = 15
 ##############################
 
 
@@ -43,10 +43,12 @@ def valeur_absolu(k):
         return k
     return -k
 
-def str_to_tuple(str):
+def str_to_tuple(str, type):
     """Permet de convertir un tuple sous forme de string en reel tuple"""
     mont = str[1:len(str) - 1] # on enleve les ()
-    return tuple(map(int, mont.split(', '))) #On separe les deux nombres et on les convertis en int, puis en tuple
+    if type == "int":
+        return tuple(map(int, mont.split(', '))) #On separe les deux nombres et on les convertis en int, puis en tuple
+    return [mont[1], int(mont[5])]
 
 def ajout_foule(i, j):
     """Cette fonction s'occupe de repartir la foule sur le point mentionné lors du mode edition"""
@@ -54,9 +56,10 @@ def ajout_foule(i, j):
         for l in range(-portee_ajout_foule + 1 ,portee_ajout_foule):
             if (i+k, j+l) not in dico_carte:
                 if randrange(0,valeur_absolu(k)+1) == 0:
-                    dico_carte[(i+k, j+l)] = "F"
-            elif dico_carte[(i+k, j+l)] == "F":
-                print("", end='') # Pour l'instant rien, on va rajouter les niveaux de foule après
+                    dico_carte[(i+k, j+l)] = ["F", 0]
+            elif dico_carte[(i+k, j+l)][0] == "F":
+                if dico_carte[(i+k, j+l)][1] != 4:
+                    dico_carte[(i + k, j + l)][1] += 1
 
 def enregistrer_carte(dico):
     """Enregistre l'etat de toutes les cellules de la carte dans un fichier temporaire"""
@@ -85,7 +88,7 @@ def ouvrir_carte():
         #######
         else:
             ligne = ligne.split(";")
-            dico_carte[str_to_tuple(ligne[0])] = str(ligne[1])
+            dico_carte[str_to_tuple(ligne[0], 'int')] = str_to_tuple(ligne[1], str)
     fichier.close()
 
 
@@ -94,9 +97,9 @@ def modifier_carreau(x, y):
     j = (cellules_largeur*x)//width # Colonne de la carte
     i = (cellules_hauteur*y)//hight # Ligne de la carte
     if bool_edition['obstacle'] is True:
-        dico_carte[(i, j)] = 'O'
+        dico_carte[(i, j)] = ['O', 0]
     elif bool_edition['sortie'] is True:
-        dico_carte[(i, j)] = 'S'
+        dico_carte[(i, j)] = ['S', 0]
     elif bool_edition['foule'] is True:
         ajout_foule(i,j)
     else:
@@ -172,14 +175,25 @@ while 1:
     for i in range(0, cellules_largeur):
         for j in range(0, cellules_hauteur):
             if (j, i) in dico_carte: #Regarde si c'est une cellule vide ou si son état est connu
-                if dico_carte[(j,i)] == 'S':
+                if dico_carte[(j,i)][0] == 'S':
                     couleur = couleur_sortie
-                elif dico_carte[(j,i)] == 'O':
+                elif dico_carte[(j,i)][0] == 'O':
                     couleur = couleur_obstacle
-                elif dico_carte[(j,i)] == 'F':
-                    couleur = couleur_foule4
+                elif dico_carte[(j,i)][0] == 'F':
+                    niveau_rouge = dico_carte[(j, i)][1]
+                    if niveau_rouge == 0:
+                        couleur = couleur_foule0
+                    elif niveau_rouge == 1:
+                        couleur = couleur_foule1
+                    elif niveau_rouge == 2:
+                        couleur = couleur_foule2
+                    elif niveau_rouge == 3:
+                        couleur = couleur_foule3
+                    else:
+                        couleur = couleur_foule4
                 else:
-                    print("Probleme de couleur dans le dictionnaire de la carte")
+                    print('', end="")
+                    #print("Probleme de couleur dans le dictionnaire de la carte")
                 pygame.draw.rect(screen, couleur, pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
             else:
                 pygame.draw.rect(screen, (255,255,255), pygame.Rect(i*taille_largeur, j*taille_hauteur, taille_largeur, taille_hauteur), 1)
