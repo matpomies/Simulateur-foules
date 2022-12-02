@@ -70,7 +70,8 @@ def pchs(i,j): # (Plus Court Chemin vers Sortie)
     coord_sortie = []
     while sortie is False:
         if len(file_attente)==0:
-            return deja_vu
+            print("Problème dans le calcul du chemin de la foule, sortie introuvable")
+            return [(i,j)]
         else:
             deja_vu.append(file_attente[0])
         is_sortie, voisins = check_entourage(file_attente[0][0], file_attente[0][1])
@@ -217,7 +218,9 @@ def edition(lettre):
 def deplacement_foule(i,j):
     "deplace d'une case la foule vers la sortie"
     chemin = pchs(i,j)
-    if len(chemin) != 0:
+    if (i, j) == chemin[len(chemin)-1]:
+        print("Erreur, une case foule essaye d'aller sur elle même")
+    elif len(chemin) != 0:
         future_case = chemin[len(chemin)-1]
         if future_case not in dico_carte:
             dico_carte[future_case] = dico_carte[(i,j)]
@@ -229,11 +232,10 @@ def deplacement_foule(i,j):
             elif dico_carte[future_case][1] != 5: # Quand seulement une partie de la foule peut se combiner
                 dico_carte[(i, j)][1] -= 5 - dico_carte[future_case][1]
                 dico_carte[future_case][1] = 5
-
-
-        elif dico_carte[future_case][0] == 'S':
+        elif dico_carte[future_case][0] == 'S': #Quand il atteint la sortie on le supprime
             del dico_carte[(i,j)]
-
+        else:
+            print("Problème dans le deplacement d'une case foule")
 dico_chemin = {} # Dictionnaire contenant les cases qui représentent un chemin
 def afficher_chemin(i, j):
     "permet d'afficher le chemin en jaune que un 'carré' foule va poursuivre"
