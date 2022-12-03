@@ -5,10 +5,9 @@ import time
 
 # To do:
 # -Print/def afficher a refaire correctement
-# -Afficher chemin a corriger (pas important)
-# -Mettre la fonction afficher le chemin dans le menu edition
 # -Ameliorer l'algorithm de mouvement de foule (Si sortie bloquée par foule, partir de la sortie et
 # trouver par cercle concentrique le premier point accessible par la foule)
+# -Mode edition maintenant par clic continu
 
 def afficher():
     print(
@@ -201,6 +200,7 @@ def modifier_carreau(x, y):
     "Cette fonction sert a éditer les cellules de la carte pendant le mode edition"
     j = (cellules_largeur * x) // width  # Colonne de la carte
     i = (cellules_hauteur * y) // hight  # Ligne de la carte
+    dico_chemin.clear()
     if bool_edition['obstacle'] is True:
         dico_carte[(i, j)] = ['O', 0]
     elif bool_edition['sortie'] is True:
