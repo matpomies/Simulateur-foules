@@ -5,36 +5,18 @@ import time
 
 
 # To do:
-# -Ameliorer l'algorithm de mouvement de foule (Si sortie bloquée par foule, partir de la sortie et
+# -Ameliorer algorithm de mouvement de foule (Si sortie bloquée par foule, partir de la sortie et
 # trouver par cercle concentrique le premier point accessible par la foule)
 # -Mode edition maintenant par clic continu
-
-def affichage():
-    menu = {
-        'Mode edition': '(p)',
-        'Sauvegarde': '(n)',
-        'Afficher/Masquer chemin': '(c)',
-        'Démarrer/Arrêter simulation': '(entrer)'
-    }
-    sous_menu = {
-        'Mode edition': [['Ajout obstacle', '(o)'], ['Ajout sortie', '(s)'], ['Ajout foule', '(f)']]
-    }
-    print("Mode emploi (touches)")
-    for key in menu.keys():
-        print(f"{menu[key]} : {key}")
-        if key in sous_menu.keys():
-            for item in sous_menu[key]:
-                print(f"    {item[1]} : {item[0]}")
+# -Remettre en fonction l'affichage du chemin de la foule
 
 
-# #######Mise en forme globale de l'application###########
 # Constantes modifiables
-affichage()
 size = width, height = 800, 500
 cellules_hauteur = 25
 cellules_largeur = 40
-portee_ajout_foule = 1  # Portée pour l'ajout de foule
-slot = "test_foule4.txt"  # Fichier à charger pour la carte
+portee_ajout_foule = 4  # Portée pour l'ajout de foule
+slot = "Slot2.txt"  # Fichier à charger pour la carte
 seconde_par_deplacement = 1  # Pas de temps entre chaque déplacement de foule
 
 
@@ -43,7 +25,9 @@ pygame.init()
 dico_carte = {}  # Ce dictionnaire contient les informations de toutes les cellules et de leur état
 screen = pygame.display.set_mode(size)
 horloge = time.process_time()
+dico_chemin = {}  # Dictionnaire contenant les cases qui représentent le chemin que les cases foules vont prendre
 temps_ancien_deplacement = 0  # Constante interne a l'horloge
+dico_memoisation_chemin = {}
 couleur_obstacle = (80, 80, 80)  # Gris
 couleur_sortie = (52, 201, 36)  # Vert
 couleur_foule1 = (240, 128, 128)  # rouge très clair
@@ -61,6 +45,73 @@ bool_edition = {
 demarrer_simulation = False
 affichage_chemin = False
 ##############################
+
+
+def affichage_console():
+    menu = {
+        'Mode edition': '(p)',
+        'Sauvegarde': '(n)',
+        'Afficher/Masquer chemin': '(c)',
+        'Démarrer/Arrêter simulation': '(entrer)'
+    }
+    sous_menu = {
+        'Mode edition': [['Ajout obstacle', '(o)'], ['Ajout sortie', '(s)'], ['Ajout foule', '(f)']]
+    }
+    print("Mode emploi (touches)")
+    for key in menu.keys():
+        print(f"{menu[key]} : {key}")
+        if key in sous_menu.keys():
+            for item in sous_menu[key]:
+                print(f"    {item[1]} : {item[0]}")
+
+def affichage(cases_changement, tout=False):
+    #print(f"affichage de {len(cases_changement)} cases")
+    "Permet de gérer l'affichage de l'application"
+    taille_largeur = int(size[0] / cellules_largeur)
+    taille_hauteur = int(size[1] / cellules_hauteur)
+
+    if tout is True: #Activé quand on ouvre le programme, permet de charger toute la carte
+        cases_changement = []
+        for i in range(0, cellules_hauteur):
+            for j in range(0, cellules_largeur):
+                cases_changement.append((i,j))
+
+    # Affichage des cellules sur l'application avec leur couleur respective
+    for case in cases_changement:
+        j , i = case[0], case[1]
+        if (j, i) in dico_carte:  # Regarde si c'est une cellule vide ou si son état est connu
+            if dico_carte[(j, i)][0] == 'S':
+                couleur = couleur_sortie
+            elif dico_carte[(j, i)][0] == 'O':
+                couleur = couleur_obstacle
+            elif dico_carte[(j, i)][0] == 'F':
+                niveau_rouge = dico_carte[(j, i)][1]
+                if affichage_chemin is True:  # Affiche en jaune le chemin de chaque case foule
+                    afficher_chemin(j, i)
+                if niveau_rouge == 1:  # Attribution de la couleur de la foule en fonction de son intensité
+                    couleur = couleur_foule1
+                elif niveau_rouge == 2:
+                    couleur = couleur_foule2
+                elif niveau_rouge == 3:
+                    couleur = couleur_foule3
+                elif niveau_rouge == 4:
+                    couleur = couleur_foule4
+                else:
+                    couleur = couleur_foule5
+            else:
+                print("Problème de couleur dans le dictionnaire de la carte")
+            pygame.draw.rect(screen, couleur,
+                             pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
+        elif (j, i) in dico_chemin:  # Si c'est un chemin jaune
+            couleur = (255, 255, 0)
+            pygame.draw.rect(screen, couleur,
+                             pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
+        else:
+            # On appelle 2 fois pygame.draw.rect pour 'nettoyer' le fond du carré
+            pygame.draw.rect(screen, (0, 0, 0),
+                             pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
+            pygame.draw.rect(screen, (255, 255, 255),
+                             pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur), 1)
 
 
 def trier_entourage(voisins, case_depart):
@@ -111,6 +162,16 @@ def pchs(i, j):  # (Plus Court Chemin vers Sortie)
     peres = []  # [(fils), (pere)]
     sortie = False
     coord_sortie = []
+
+    chemin_libre = True # On regarde si le chemin est libre
+    if (i,j) in dico_memoisation_chemin:
+        for case in dico_memoisation_chemin[(i,j)]:
+            if case in dico_carte:
+                if dico_carte[(case[0], case[1])][0] != "F" and dico_carte[(case[0], case[1])][0] != "S":
+                    chemin_libre = False
+        if chemin_libre == True:
+            return dico_memoisation_chemin[(i,j)]
+
     while sortie is False:
         if len(file_attente) == 0:
             print("Problème dans le calcul du chemin de la foule, sortie introuvable")
@@ -129,7 +190,10 @@ def pchs(i, j):  # (Plus Court Chemin vers Sortie)
                 file_attente.append(voisin)
                 peres.append([voisin, file_attente[0]])
         file_attente.pop(0)
-    return remonter_peres(peres, coord_sortie, (i, j))
+    chemin_sortie = remonter_peres(peres, coord_sortie, (i, j))
+    for i in range(0, len(chemin_sortie)):
+        dico_memoisation_chemin[(chemin_sortie[i][0], chemin_sortie[i][1])] = chemin_sortie[:i]
+    return chemin_sortie
 
 
 def remonter_peres(peres, coord_sortie, coord_entree):
@@ -165,14 +229,18 @@ def str_to_tuple(ligne, type):
 
 def ajout_foule(i, j):
     """Cette fonction s'occupe de repartir la foule sur le point mentionné lors du mode edition"""
+    liste_foule_ajoutee = [] # Tableau contenant toutes les cases de foule générées pour la fonction affichage
     for k in range(-portee_ajout_foule + 1, portee_ajout_foule):
         for l in range(-portee_ajout_foule + 1, portee_ajout_foule):
             if (i + k, j + l) not in dico_carte:
                 if randrange(0, valeur_absolu(k) + 1) == 0:
                     dico_carte[(i + k, j + l)] = ["F", 1]
+                    liste_foule_ajoutee.append([i+k, j+ l])
             elif dico_carte[(i + k, j + l)][0] == "F" and randrange(0, valeur_absolu(k) + 1) == 0:
                 if dico_carte[(i + k, j + l)][1] != 4:
                     dico_carte[(i + k, j + l)][1] += 1
+                    liste_foule_ajoutee.append([i + k, j + l])
+    affichage(liste_foule_ajoutee)
 
 
 def enregistrer_carte(dico):
@@ -200,17 +268,17 @@ def ouvrir_carte():
             if int(ligne[0]) != cellules_largeur or int(ligne[1]) != cellules_hauteur:
                 print("Mauvaise dimension des cellules")
         #######
-        else:
+        else: # C'est les bonnes dimensions, on charge la carte
             ligne = ligne.split(";")
             dico_carte[str_to_tuple(ligne[0], 'int')] = str_to_tuple(ligne[1], str)
     fichier.close()
-
 
 def modifier_carreau(x, y):
     """Cette fonction sert à éditer les cellules de la carte pendant le mode edition"""
     j = (cellules_largeur * x) // width  # Colonne de la carte
     i = (cellules_hauteur * y) // height  # Ligne de la carte
     dico_chemin.clear()
+    dico_memoisation_chemin.clear()
     if bool_edition['obstacle'] is True:
         dico_carte[(i, j)] = ['O', 0]
     elif bool_edition['sortie'] is True:
@@ -222,6 +290,7 @@ def modifier_carreau(x, y):
             del (dico_carte[(i, j)])
         else:
             print("Erreur, il n'y a rien a faire sur cette cases")
+    affichage([[i,j]])
 
 
 def edition(lettre):
@@ -279,12 +348,11 @@ def deplacement_foule(i, j):
                 dico_carte[(i, j)][1] -= 5 - dico_carte[future_case][1]
                 dico_carte[future_case][1] = 5
         elif dico_carte[future_case][0] == 'S':  # Quand il atteint la sortie on le supprime
+            #print(f"La foule numéro {coord_to_identite(i,j)} a trouvé la sortie !")
             del dico_carte[(i, j)]
         else:
             print("Problème dans le déplacement d'une case foule")
-
-
-dico_chemin = {}  # Dictionnaire contenant les cases qui représentent un chemin
+    affichage([[i, j], future_case])
 
 
 def afficher_chemin(i, j):
@@ -292,9 +360,13 @@ def afficher_chemin(i, j):
     chemin_sortie = pchs(i, j)
     for case in chemin_sortie:
         dico_chemin[(case[0], case[1])] = 'J'
+    affichage(dico_chemin)
+
 
 
 ouvrir_carte()  # On charge le dictionnaire qui contient les informations des cases de la carte
+affichage_console()  # Affichage du menu
+affichage([[0,0]],tout=True) # On affiche toute la carte pour la charger
 while 1:
     for event in pygame.event.get():
         # print(event)
@@ -319,13 +391,14 @@ while 1:
                     demarrer_simulation = False
                     print("Simulation stoppée!")
             if event.key == 99:  # c
-                if affichage_chemin is False:
+                print("Fonctionnalité désactivée")
+                """if affichage_chemin is False:
                     affichage_chemin = True
                     print("Chemin affiché!")
                 else:
                     affichage_chemin = False
                     print("Chemin masqué!")
-                    dico_chemin.clear()
+                    dico_chemin.clear()"""
         if event.type == pygame.QUIT:
             enregistrer_carte(dico_carte)
             sys.exit()
@@ -336,50 +409,15 @@ while 1:
             demarrer_simulation is True):  # Pour afficher un déplacement par pas de temps
         temps_ancien_deplacement = horloge
         dico_chemin.clear()
-        for point in liste_foule:
-            deplacement_foule(point[0], point[1])
-    liste_foule = []  # Liste chacun des 'carrés' foule à faire bouger
+        liste_foule_a_deplacer = []# Liste chacun des 'carrés' foule à faire bouger
+        for i in range(0, cellules_hauteur):
+            for j in range(0, cellules_largeur):
+                if (i,j) in dico_carte:
+                    if dico_carte[(i, j)][0] == 'F':
+                        liste_foule_a_deplacer.append((i,j))
+        for case in liste_foule_a_deplacer:
+            deplacement_foule(case[0], case[1])
 
-    # ############Quadrillage###########
-    taille_largeur = size[0] / cellules_largeur
-    taille_hauteur = size[1] / cellules_hauteur
-    # Affichage des cellules sur l'application avec leur couleur respective
-    for i in range(0, cellules_largeur):
-        for j in range(0, cellules_hauteur):
-            if (j, i) in dico_carte:  # Regarde si c'est une cellule vide ou si son état est connu
-                if dico_carte[(j, i)][0] == 'S':
-                    couleur = couleur_sortie
-                elif dico_carte[(j, i)][0] == 'O':
-                    couleur = couleur_obstacle
-                elif dico_carte[(j, i)][0] == 'F':
-                    niveau_rouge = dico_carte[(j, i)][1]
-                    if affichage_chemin is True:  # Affiche en jaune le chemin de chaque case foule
-                        afficher_chemin(j, i)
-                    if niveau_rouge == 1:  # Attribution de la couleur de la foule en fonction de son intensité
-                        couleur = couleur_foule1
-                    elif niveau_rouge == 2:
-                        couleur = couleur_foule2
-                    elif niveau_rouge == 3:
-                        couleur = couleur_foule3
-                    elif niveau_rouge == 4:
-                        couleur = couleur_foule4
-                    else:
-                        couleur = couleur_foule5
-                    if demarrer_simulation is True:
-                        liste_foule.append((j, i))
-                else:
-                    print("Problème de couleur dans le dictionnaire de la carte")
-                pygame.draw.rect(screen, couleur,
-                                 pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
-            elif (j, i) in dico_chemin:  # Si c'est un chemin jaune
-                couleur = (255, 255, 0)
-                pygame.draw.rect(screen, couleur,
-                                 pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
-            else:
-                # On appelle 2 fois pygame.draw.rect pour 'nettoyer' le fond du carré
-                pygame.draw.rect(screen, (0, 0, 0),
-                                 pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur))
-                pygame.draw.rect(screen, (255, 255, 255),
-                                 pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur), 1)
+
     ##################################
     pygame.display.flip()
