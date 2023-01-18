@@ -5,17 +5,17 @@ import time
 
 
 # To do:
-# -Ameliorer algorithm de mouvement de foule (Si sortie bloquée par foule, partir de la sortie et
-# trouver par cercle concentrique le premier point accessible par la foule)
 # -Mode edition maintenant par clic continu
 # -Remettre en fonction l'affichage du chemin de la foule
+# -Regler le problème de calcul du chemin de la foule dans certains cas particuliers
+#   (Si réglé la foule ne se compile plus entre elle) ligne 158 : elif -> if
 
 
 # Constantes modifiables
 size = width, height = 800, 500
 cellules_hauteur = 25
 cellules_largeur = 40
-portee_ajout_foule = 4  # Portée pour l'ajout de foule
+portee_ajout_foule = 4 # Portée pour l'ajout de foule
 slot = "Slot2.txt"  # Fichier à charger pour la carte
 seconde_par_deplacement = 1  # Pas de temps entre chaque déplacement de foule
 
@@ -27,6 +27,7 @@ screen = pygame.display.set_mode(size)
 horloge = time.process_time()
 dico_chemin = {}  # Dictionnaire contenant les cases qui représentent le chemin que les cases foules vont prendre
 temps_ancien_deplacement = 0  # Constante interne a l'horloge
+nombre_tours_simulation = 0
 dico_memoisation_chemin = {}
 couleur_obstacle = (80, 80, 80)  # Gris
 couleur_sortie = (52, 201, 36)  # Vert
@@ -65,7 +66,6 @@ def affichage_console():
                 print(f"    {item[1]} : {item[0]}")
 
 def affichage(cases_changement, tout=False):
-    #print(f"affichage de {len(cases_changement)} cases")
     "Permet de gérer l'affichage de l'application"
     taille_largeur = int(size[0] / cellules_largeur)
     taille_hauteur = int(size[1] / cellules_hauteur)
@@ -129,7 +129,7 @@ def trier_entourage(voisins, case_depart):
     return liste_triee
 
 
-def check_entourage(i, j):
+def check_entourage(i, j, foule=False, tableau_sortie=[]):
     """Cette fonction renvoie la liste de l'entourage vide de la case demandée, ou si la sortie est à proximité"""
     voisins_vides = []
     is_sortie = [False, ()]
@@ -148,37 +148,49 @@ def check_entourage(i, j):
             if coin_licite is True:
                 if (i + k, j + l) not in dico_carte:
                     voisins_vides.append((i + k, j + l))
-                elif dico_carte[(i + k, j + l)][0] == 'S':  # Est-ce que la sortie est à proximité ?
-                    is_sortie = [True, (i + k, j + l)]
-                elif dico_carte[(i + k, j + l)][0] == 'F':  # On ne compte pas la foule comme un obstacle
+                    if (i + k, j + l) in tableau_sortie:
+                        is_sortie = [True, (i + k, j + l)]
+                        return is_sortie, trier_entourage(voisins_vides, (i, j))
+                elif dico_carte[(i + k, j + l)][0] == 'F' and foule is False:  # On ne compte pas la foule comme un obstacle
                     voisins_vides.append((i + k, j + l))
+                elif len(tableau_sortie) == 0: # Dans le cas ou on cherche une sortie
+                    if dico_carte[(i + k, j + l)][0] == 'S':  # Est-ce que la sortie est à proximité ?
+                        is_sortie = [True, (i + k, j + l)]
+                elif len(tableau_sortie)!=0:
+                    if (i + k, j + l) in tableau_sortie :
+                        is_sortie = [True, (i + k, j + l)]
+                        return is_sortie, trier_entourage(voisins_vides, (i, j))
     return is_sortie, trier_entourage(voisins_vides, (i, j))
 
 
-def pchs(i, j):  # (Plus Court Chemin vers Sortie)
+def pchs(i, j, tab_sortie,inverse=False):  # (Plus Court Chemin vers Sortie)
     """Calcul pour chaque foule le plus court chemin en utilisant un parcours en largeur"""
     file_attente = [(i, j)]
     deja_vu = []
     peres = []  # [(fils), (pere)]
     sortie = False
     coord_sortie = []
-
-    chemin_libre = True # On regarde si le chemin est libre
-    if (i,j) in dico_memoisation_chemin:
+    # Pour ne pas recalculer inutilement plusieurs fois le même chemin, on regarde si le chemin à déjà été calculer
+    # pour une case, puis on vérifie qu'il marche toujours.
+    chemin_libre = True
+    if (i,j) in dico_memoisation_chemin and inverse is False and len(tab_sortie)==0:
         for case in dico_memoisation_chemin[(i,j)]:
             if case in dico_carte:
                 if dico_carte[(case[0], case[1])][0] != "F" and dico_carte[(case[0], case[1])][0] != "S":
+                    del dico_memoisation_chemin[(i,j)]
                     chemin_libre = False
         if chemin_libre == True:
             return dico_memoisation_chemin[(i,j)]
 
     while sortie is False:
         if len(file_attente) == 0:
+            if inverse is True:
+                return deja_vu, False
             print("Problème dans le calcul du chemin de la foule, sortie introuvable")
             return [(i, j)]
         else:
             deja_vu.append(file_attente[0])
-        is_sortie, voisins = check_entourage(file_attente[0][0], file_attente[0][1])
+        is_sortie, voisins = check_entourage(file_attente[0][0], file_attente[0][1], foule=inverse, tableau_sortie=tab_sortie)
         if is_sortie[0] is True:  # Est-ce qu'on a trouvé la sortie ?
             sortie = True
             coord_sortie = is_sortie[1]
@@ -191,8 +203,11 @@ def pchs(i, j):  # (Plus Court Chemin vers Sortie)
                 peres.append([voisin, file_attente[0]])
         file_attente.pop(0)
     chemin_sortie = remonter_peres(peres, coord_sortie, (i, j))
-    for i in range(0, len(chemin_sortie)):
-        dico_memoisation_chemin[(chemin_sortie[i][0], chemin_sortie[i][1])] = chemin_sortie[:i]
+    if inverse is False and len(tab_sortie) == 0:
+        for i in range(0, len(chemin_sortie)):
+            dico_memoisation_chemin[(chemin_sortie[i][0], chemin_sortie[i][1])] = chemin_sortie[:i]
+    if inverse is True:
+        return chemin_sortie, True
     return chemin_sortie
 
 
@@ -332,9 +347,18 @@ def edition(lettre):
 
 def deplacement_foule(i, j):
     """Déplace d'une case la foule vers la sortie"""
-    chemin = pchs(i, j)
-    if (i, j) == chemin[len(chemin) - 1]:
+    chemin = pchs(i, j, [])
+    chemin_foule, libre = pchs(i,j, [],inverse=True)
+    if libre is False:
+        chemin_foule.append((i,j)) # Donne la possibilitée de rester stationnaire
+        chemin2 = pchs(chemin[0][0], chemin[0][1] , chemin_foule)
+        chemin = pchs(i,j, [(chemin2[0][0], chemin2[0][1])])
+    if len(chemin) == 0:
+        print("Stationnement")
+        future_case = i,j
+    elif (i, j) == chemin[len(chemin) - 1]:
         print("Erreur, une case foule essaye d'aller sur elle même")
+        future_case = i,j
     elif len(chemin) != 0:
         future_case = chemin[len(chemin) - 1]
         if future_case not in dico_carte:
@@ -387,6 +411,7 @@ while 1:
                 if demarrer_simulation is False:
                     demarrer_simulation = True
                     print("Simulation démarrée!")
+                    nombre_tours_simulation = 0
                 else:
                     demarrer_simulation = False
                     print("Simulation stoppée!")
@@ -415,9 +440,13 @@ while 1:
                 if (i,j) in dico_carte:
                     if dico_carte[(i, j)][0] == 'F':
                         liste_foule_a_deplacer.append((i,j))
+        if len(liste_foule_a_deplacer) == 0:
+            print(f"Nombre de tours : {nombre_tours_simulation}")
+            print("Simulation terminée!")
+            demarrer_simulation = False
+        nombre_tours_simulation += 1
         for case in liste_foule_a_deplacer:
             deplacement_foule(case[0], case[1])
 
 
-    ##################################
     pygame.display.flip()
