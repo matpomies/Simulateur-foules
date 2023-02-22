@@ -10,22 +10,27 @@ import time
 # -Remettre en fonction l'affichage du chemin de la foule
 # Rajouter la densitée de foule
 # Mettre un meilleur algo de tri
-# Refaire totalement le parcours de plus courte distance avec les distances euclidienne en optimisant 
+# fixer le bourbier
+
+#CERCLE DE VOLONTE DE PARCOURS LORSQUE LA SORTIE EST OBSTRUEE PAR LA FOULE !!!!
 
 
 # Constantes modifiables
 size = width, height = 800, 500
 cellules_hauteur = 25
 cellules_largeur = 40
-portee_ajout_foule = 4 # Portée pour l'ajout de foule
+portee_ajout_foule = 3 # Portée pour l'ajout de foule
 slot = "Slot2.txt"  # Fichier à charger pour la carte
 seconde_par_deplacement = 1  # Pas de temps entre chaque déplacement de foule
+distance_minimale_effort = 0 # Pas implémenté encore
+distance_maximale_effort = 9
 
 
 # Constantes a ne pas toucher
 pygame.init()
 dico_carte = {}  # Ce dictionnaire contient les informations de toutes les cellules et de leur état
 dico_distance_euclidienne = {}
+dico_pchs = {}
 screen = pygame.display.set_mode(size)
 horloge = time.process_time()
 sorties = []
@@ -199,8 +204,36 @@ def determiner_dico_distance_euclidienne():
                 fin = True
 
 
+def determiner_dico_pchs():
+    """Determine le plus court chemin en distance euclidienne vers la sortie pour chaque case en ne prenant pas en
+    compte la foule comme obstacle """
+    for i in range(0, cellules_hauteur):
+        for j in range(0, cellules_largeur):
+            calcul_autorise = False
+            if (i,j) in dico_carte:
+                if dico_carte[(i,j)][0] == "F":
+                    calcul_autorise = True
+            else:
+                calcul_autorise = True
+
+            if calcul_autorise is True:
+                sortie_trouve, _ = check_entourage(i,j, sorties) # Le check_entourage renvoie l'entourage dans
+                # l'ordre du plus court vers la sortie en distance euclidienne
+                chemin = [(i,j)]
+                while sortie_trouve[0] is False:
+                    sortie_trouve, prochain_chemin = check_entourage(chemin[len(chemin) - 1][0], chemin[len(chemin) - 1][1], sorties)
+                    if sortie_trouve[0] is False:
+                        while prochain_chemin[0] in chemin:
+                            prochain_chemin.pop(0)
+                        chemin.append(prochain_chemin[0])
+                chemin.append(sortie_trouve[1])
+                chemin.pop(0)
+                chemin.reverse()
+                dico_pchs[(i,j)] = chemin
+
+
 def trier_entourage_distance_euclidienne(voisins, case_depart):
-    """Prend la liste des voisins proches pour les trier selon leur distance a la sortie la plus proche"""
+    """Prend la liste des voisins proches pour les trier selon leur distance à la sortie la plus proche"""
     liste_triee = []
     for voisin in voisins:
         if voisin[0] != case_depart[0] and voisin[1] != case_depart[1]:
@@ -226,6 +259,27 @@ def trier_entourage(voisins, case_depart):
     for voisin in liste_attente:  # On ajoute à la fin les voisins dans les coins
         liste_triee.append(voisin)
     return liste_triee
+
+
+def determiner_cercle_maximal_effort(i,j, rayon):
+    "Determine le cercle voisin d'un cellule d'un certain rayon donné"
+    liste_attente_future = [(i,j)]
+    deja_vu = []
+    for _ in range(0,rayon+1):
+        liste_attente_actuelle = [case for case in liste_attente_future]
+        liste_attente_future.clear()
+        for case in liste_attente_actuelle:
+            deja_vu.append(case)
+            voisins = check_entourage(case[0], case[1], [], distance_non_euclidienne=False)[1]
+            for voisin in voisins:
+                if (voisin not in deja_vu) and (voisin not in liste_attente_actuelle) and (voisin not in liste_attente_future):
+                    if abs(voisin[0] - i)  + abs(voisin[1] - j) < 2*rayon:
+                        if voisin not in dico_carte:
+                            liste_attente_future.append(voisin)
+
+    for case in liste_attente_future:
+        deja_vu.append(case)
+    return deja_vu
 
 
 def check_entourage(i, j, tableau_sortie,foule=False, distance_non_euclidienne = False):
@@ -399,12 +453,15 @@ def modifier_carreau(x, y):
     if bool_edition['obstacle'] is True:
         dico_carte[(i, j)] = ['O', 0]
         determiner_dico_distance_euclidienne()
+        determiner_dico_pchs()
     elif bool_edition['sortie'] is True:
         dico_carte[(i, j)] = ['S', 0]
         check_sortie()
         determiner_dico_distance_euclidienne()
+        determiner_dico_pchs()
     elif bool_edition['foule'] is True:
         ajout_foule(i, j)
+        determiner_cercle_maximal_effort(i,j, 2)
     else:
         if (i, j) in dico_carte:
             del (dico_carte[(i, j)])
@@ -453,18 +510,33 @@ def edition(lettre):
 
 def deplacement_foule(i, j, distance_sortie):
     """Déplace d'une case la foule vers la sortie"""
-    chemin = pchs(i, j, sorties)
-    chemin_foule, libre = pchs(i,j, [(chemin[0][0], chemin[0][1])], foule_as_obstacle=True)
-    if libre is False:
-        chemin_foule.append((i,j)) # Donne la possibilitée de rester stationnaire
-        chemin2 = pchs(chemin[0][0], chemin[0][1] , chemin_foule)
-        chemin, _ = pchs(i,j, [(chemin2[0][0], chemin2[0][1])], foule_as_obstacle=True)
-    else:
-        chemin = chemin_foule
+    chemin_sortie = pchs(i,j, sorties)
+    cercle_effort = determiner_cercle_maximal_effort(i, j, distance_maximale_effort)
+
+    chemin_inverse = pchs(chemin_sortie[0][0], chemin_sortie[0][1] , cercle_effort)
+
+    chemin_sans_sortie, _ = pchs(i,j, [(chemin_inverse[0][0], chemin_inverse[0][1])], foule_as_obstacle=True)
+
+    chemin = [(chemin_sortie[0][0], chemin_sortie[0][1])]
+
+    for case in chemin_sans_sortie:
+        chemin.append(case)
+
+    stationnement = False
+    #if libre is False:
+    #    if distance_euclidienne(i,j, chemin) > distance_maximale_effort or distance_euclidienne(i,j, chemin) < distance_minimale_effort:
+    #        stationnement = False
 
     if len(chemin) == 0:
-        future_case = i,j
+        stationnement = True
+    elif len(chemin) == 2: # bourbier a fixer
+        if (i, j) == chemin[len(chemin) - 1]:
+            chemin.pop(1)
+
     elif (i, j) == chemin[len(chemin) - 1]:
+        stationnement = True
+
+    if stationnement is True:
         future_case = i,j
     elif len(chemin) != 0:
         #dico_carte[(i, j)][1] = 1 #######
@@ -501,6 +573,7 @@ def afficher_chemin(i, j):
 ouvrir_carte()  # On charge le dictionnaire qui contient les informations des cases de la carte
 check_sortie()
 determiner_dico_distance_euclidienne()
+determiner_dico_pchs()
 affichage_console()  # Affichage du menu
 affichage([[0,0]],tout=True) # On affiche toute la carte pour la charger
 while 1:
@@ -564,7 +637,7 @@ while 1:
         for k in range(0,len(liste_foule_a_deplacer)):
             case = liste_foule_a_deplacer[k]
             #print(f"case: ({case[0]},{case[1]} longueur: {distance_euclidienne(case[0], case[1], pchs(case[0], case[1], sorties))}\ncar chemin: {pchs(case[0], case[1], sorties)}")
-            liste_foule_a_deplacer[k] = [(case[0], case[1]), distance_euclidienne(case[0], case[1], pchs(case[0], case[1], sorties))]
+            liste_foule_a_deplacer[k] = [(case[0], case[1]), distance_euclidienne(case[0], case[1], dico_pchs[(case[0], case[1])])]
         #Trie
         tri_foule(liste_foule_a_deplacer)
         # Puis on deplace
