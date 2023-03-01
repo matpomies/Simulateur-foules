@@ -8,13 +8,14 @@ import time
 # To do:
 # -Mode edition maintenant par clic continu
 # -Remettre en fonction l'affichage du chemin de la foule
+# -Vérification de la carte avant le lancement d'une simulation
 
 # Constantes modifiables
 size = width, height = 800, 500
 cellules_hauteur = 25
 cellules_largeur = 40
 portee_ajout_foule = 4 # Portée pour l'ajout de foule
-slot = "Slot2.txt"  # Fichier à charger pour la carte
+slot = "Slot_lucien.txt"  # Fichier à charger pour la carte
 seconde_par_deplacement = 1  # Pas de temps entre chaque déplacement de foule
 distance_maximale_effort = 9
 
@@ -173,6 +174,14 @@ def affichage(cases_changement, tout=False):
                              pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur), 1)
 
 
+def verification_carte(): # Pas implémentée
+    """Vérifie avant chaque simulation que toutes les zones sont accessibles et chaque sortie également, en laissant
+    la possibilité à l'utilisateur de lancer quand même"""
+
+    # Erreur trouvée
+    input("Continuer quand même? (O/N)\n>")
+
+
 def check_sortie():
     """Actualise la variable globale "sorties" """
     sorties.clear()
@@ -182,6 +191,7 @@ def check_sortie():
 
 
 def determiner_dico_distance_euclidienne():
+    dico_distance_euclidienne.clear()
     for sortie in sorties:
         dico_distance_euclidienne[(sortie[0], sortie[1])] = 0
         liste_attente = [(sortie[0], sortie[1])]
@@ -218,6 +228,7 @@ def determiner_dico_distance_euclidienne():
 def determiner_dico_pchs():
     """Determine le plus court chemin en distance euclidienne vers la sortie pour chaque case en ne prenant pas en
     compte la foule comme obstacle """
+    dico_pchs.clear()
     for i in range(0, cellules_hauteur):
         for j in range(0, cellules_largeur):
             calcul_autorise = False
@@ -463,20 +474,13 @@ def modifier_carreau(x, y):
     dico_memoisation_chemin.clear()
     if bool_edition['obstacle'] is True:
         dico_carte[(i, j)] = ['O', 0]
-        determiner_dico_distance_euclidienne()
-        determiner_dico_pchs()
     elif bool_edition['sortie'] is True:
         dico_carte[(i, j)] = ['S', 0]
-        check_sortie()
-        determiner_dico_distance_euclidienne()
-        determiner_dico_pchs()
     elif bool_edition['foule'] is True:
         ajout_foule(i, j)
-        determiner_cercle_maximal_effort(i,j, 2)
     else:
         if (i, j) in dico_carte:
-            del (dico_carte[(i, j)])
-            check_sortie()
+            dico_carte.pop((i,j))
         else:
             print("Erreur, il n'y a rien a faire sur cette cases")
     affichage([[i,j]])
@@ -500,6 +504,9 @@ def edition(lettre):
         else:
             for key in bool_edition.keys():  # Si on désactive le mode edition, on désactive tous les modes d'ajouts
                 bool_edition[key] = False
+            check_sortie()
+            determiner_dico_distance_euclidienne()
+            determiner_dico_pchs()
             print("Mode edition désactive")
     else:  # Cette partie permet de verifier si un autre mode d'ajout n'est pas déjà activé pour éviter un conflit
         if bool_edition['edition'] is True:
@@ -592,9 +599,13 @@ while 1:
                 enregistrer_carte(dico_carte)
             if event.key == 13:  # entrer
                 if demarrer_simulation is False:
-                    demarrer_simulation = True
-                    print("Simulation démarrée!")
-                    nombre_tours_simulation = 0
+                    if bool_edition['edition'] is False:
+                        #verification_carte()
+                        demarrer_simulation = True
+                        print("Simulation démarrée!")
+                        nombre_tours_simulation = 0
+                    else:
+                        print("Désactivez le mode édition avant de démarrer la simulation!")
                 else:
                     demarrer_simulation = False
                     print("Simulation stoppée!")
