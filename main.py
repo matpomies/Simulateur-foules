@@ -8,21 +8,14 @@ import time
 # To do:
 # -Mode edition maintenant par clic continu
 # -Remettre en fonction l'affichage du chemin de la foule
-# Rajouter la densitée de foule
-# Mettre un meilleur algo de tri
-# fixer le bourbier
-
-#CERCLE DE VOLONTE DE PARCOURS LORSQUE LA SORTIE EST OBSTRUEE PAR LA FOULE !!!!
-
 
 # Constantes modifiables
 size = width, height = 800, 500
 cellules_hauteur = 25
 cellules_largeur = 40
-portee_ajout_foule = 3 # Portée pour l'ajout de foule
+portee_ajout_foule = 4 # Portée pour l'ajout de foule
 slot = "Slot2.txt"  # Fichier à charger pour la carte
 seconde_par_deplacement = 1  # Pas de temps entre chaque déplacement de foule
-distance_minimale_effort = 0 # Pas implémenté encore
 distance_maximale_effort = 9
 
 
@@ -75,18 +68,36 @@ def affichage_console():
                 print(f"    {item[1]} : {item[0]}")
 
 
+def fusion(gauche, droite):
+    """Fonction complémentaire pour tri foule en fusion"""
+    resultat = []
+    index_gauche, index_droite = 0, 0
+    while index_gauche < len(gauche) and index_droite < len(droite):
+        if gauche[index_gauche][1] <= droite[index_droite][1]:
+            resultat.append(gauche[index_gauche])
+            index_gauche += 1
+        else:
+            resultat.append(droite[index_droite])
+            index_droite += 1
+    if gauche:
+        resultat.extend(gauche[index_gauche:])
+    if droite:
+        resultat.extend(droite[index_droite:])
+    return resultat
+
+
 def tri_foule(tableau):
-    """Trie par _______ (a remplir) les élements dans l'ordre croissant d'un tableau de tableau en fonction de son deuxième element
+    """Trie par fusion les élements dans l'ordre croissant d'un tableau de tableau en fonction de son deuxième element
     exemple : [[element1, 33], [element2, 28]] devient [[element2, 28], [element1, 33]]
     """
-
-    # Tri a bulle temporaire car il n'est pas efficace
-    for i in range(0, len(tableau)):
-        min = i # On initialise
-        for j in range(i, len(tableau)):
-            if tableau[j][1] < tableau[min][1]:
-                min = j
-        tableau[i], tableau[min] = tableau[min], tableau[i]
+    if len(tableau) <= 1:
+        return tableau
+    milieu = len(tableau) // 2
+    gauche = tableau[:milieu]
+    droite = tableau[milieu:]
+    gauche = tri_foule(gauche)
+    droite = tri_foule(droite)
+    return list(fusion(gauche, droite))
 
 
 def distance_euclidienne(i,j, chemin):
@@ -242,7 +253,7 @@ def trier_entourage_distance_euclidienne(voisins, case_depart):
             liste_triee.append([voisin, dico_distance_euclidienne[voisin]+1])
         else:
             liste_triee.append([voisin, dico_distance_euclidienne[voisin]])
-    tri_foule(liste_triee)
+    liste_triee = tri_foule(liste_triee)
     return [voisin[0] for voisin in liste_triee]
 
 
@@ -510,36 +521,23 @@ def edition(lettre):
 
 def deplacement_foule(i, j, distance_sortie):
     """Déplace d'une case la foule vers la sortie"""
-    chemin_sortie = pchs(i,j, sorties)
+    chemin_sortie = pchs(i, j, sorties)
     cercle_effort = determiner_cercle_maximal_effort(i, j, distance_maximale_effort)
 
     chemin_inverse = pchs(chemin_sortie[0][0], chemin_sortie[0][1] , cercle_effort)
 
-    chemin_sans_sortie, _ = pchs(i,j, [(chemin_inverse[0][0], chemin_inverse[0][1])], foule_as_obstacle=True)
+    chemin_sans_sortie, est_sortie = pchs(i, j, [(chemin_inverse[0][0], chemin_inverse[0][1])], foule_as_obstacle=True)
 
-    chemin = [(chemin_sortie[0][0], chemin_sortie[0][1])]
+    est_sortie, _ = check_entourage(i, j, sorties)
 
-    for case in chemin_sans_sortie:
-        chemin.append(case)
+    if est_sortie[0] is True:
+        chemin = [est_sortie[1]]
+    else:
+        chemin = []
+        for case in chemin_sans_sortie:
+            chemin.append(case)
 
-    stationnement = False
-    #if libre is False:
-    #    if distance_euclidienne(i,j, chemin) > distance_maximale_effort or distance_euclidienne(i,j, chemin) < distance_minimale_effort:
-    #        stationnement = False
-
-    if len(chemin) == 0:
-        stationnement = True
-    elif len(chemin) == 2: # bourbier a fixer
-        if (i, j) == chemin[len(chemin) - 1]:
-            chemin.pop(1)
-
-    elif (i, j) == chemin[len(chemin) - 1]:
-        stationnement = True
-
-    if stationnement is True:
-        future_case = i,j
-    elif len(chemin) != 0:
-        #dico_carte[(i, j)][1] = 1 #######
+    if len(chemin) != 0:
         future_case = chemin[len(chemin) - 1]
         if future_case not in dico_carte:
             dico_carte[future_case] = dico_carte[(i, j)]
@@ -636,10 +634,9 @@ while 1:
         # avec la sortie, car ce calcul est mémoîsé.
         for k in range(0,len(liste_foule_a_deplacer)):
             case = liste_foule_a_deplacer[k]
-            #print(f"case: ({case[0]},{case[1]} longueur: {distance_euclidienne(case[0], case[1], pchs(case[0], case[1], sorties))}\ncar chemin: {pchs(case[0], case[1], sorties)}")
             liste_foule_a_deplacer[k] = [(case[0], case[1]), distance_euclidienne(case[0], case[1], dico_pchs[(case[0], case[1])])]
         #Trie
-        tri_foule(liste_foule_a_deplacer)
+        liste_foule_a_deplacer =  tri_foule(liste_foule_a_deplacer)
         # Puis on deplace
         for case in liste_foule_a_deplacer:
             deplacement_foule(case[0][0], case[0][1], case[1])
