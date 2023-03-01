@@ -1,23 +1,41 @@
+# https://github.com/sauvajohnz
 import sys
 import pygame
 from random import randrange
 import time
-
-
 
 # To do:
 # -Mode edition maintenant par clic continu
 # -Remettre en fonction l'affichage du chemin de la foule
 # -Vérification de la carte avant le lancement d'une simulation
 
-# Constantes modifiables
+########################### CONSTANTES MODIFIABLES ########################################
+
+##Modification de la carte ##
+
+# width : largeur de la fenêtre en pixel
+# height : hauteur de la fenêtre en pixel
 size = width, height = 800, 500
+
+# cellules_hauteur : nombre de cellules sur une colonne
+# cellules_largeur : nombre de cellules sur une ligne
 cellules_hauteur = 25
 cellules_largeur = 40
-portee_ajout_foule = 4 # Portée pour l'ajout de foule
-slot = "Slot_lucien.txt"  # Fichier à charger pour la carte
-seconde_par_deplacement = 1  # Pas de temps entre chaque déplacement de foule
+
+## Modification du comportement du programme ##
+
+# portee_ajout_foule : portée en case de l'ajout de foule (pour ajouter beaucoup de cases foule rapidement)
+portee_ajout_foule = 4
+
+# slot : fichier text à charger pour charger la carte de simulation
+slot = "Slot_lucien.txt"
+
+# seconde_par_deplacement : temps en seconde à attendre au minimum entre chaque tour
+seconde_par_deplacement = 1
+
+# distance_maximale_effort : cercle maximal de déplacement d'une case foule (sur un seul tour)
 distance_maximale_effort = 9
+###########################################################################################
 
 
 # Constantes a ne pas toucher
@@ -48,10 +66,13 @@ bool_edition = {
 }
 demarrer_simulation = False
 affichage_chemin = False
+
+
 ##############################
 
 
 def affichage_console():
+    """Affiche le menu pour modifier le programme pendant son fonctionnement"""
     menu = {
         'Mode edition': '(p)',
         'Sauvegarde': '(n)',
@@ -101,20 +122,20 @@ def tri_foule(tableau):
     return list(fusion(gauche, droite))
 
 
-def distance_euclidienne(i,j, chemin):
+def distance_euclidienne(i, j, chemin):
     """Calcul la longueur d'un chemin en mètres (1 case = 1 mètre)"""
-    chemin.reverse() # Car le chemin commence au dernier indice
+    chemin.reverse()  # Car le chemin commence au dernier indice
 
     if len(chemin) == 0:
         return 0
     longueur_chemin = 0
-    case_precedente = (i,j) # On initialise
+    case_precedente = (i, j)  # On initialise
     for k in range(0, len(chemin)):
-        if chemin[k][0] != case_precedente[0] and chemin[k][1] != case_precedente[1]: # Longueur d'une diagonale
-            longueur_chemin += 1.41 # Racine carrée de 2
-        elif chemin[k][0] != case_precedente[0] or chemin[k][1] != case_precedente[1]: # Longueur d'un côté
+        if chemin[k][0] != case_precedente[0] and chemin[k][1] != case_precedente[1]:  # Longueur d'une diagonale
+            longueur_chemin += 1.41  # Racine carrée de 2
+        elif chemin[k][0] != case_precedente[0] or chemin[k][1] != case_precedente[1]:  # Longueur d'un côté
             longueur_chemin += 1
-        elif chemin[k][0] == case_precedente[0] and chemin[k][1] == case_precedente[1]: # Elle se déplace sur elle même
+        elif chemin[k][0] == case_precedente[0] and chemin[k][1] == case_precedente[1]:  # Elle se déplace sur elle même
             return 0
         else:
             print("Problème dans le calcul de la distance euclidienne")
@@ -128,21 +149,21 @@ def affichage(cases_changement, tout=False):
     taille_largeur = int(size[0] / cellules_largeur)
     taille_hauteur = int(size[1] / cellules_hauteur)
 
-    if tout is True: #Activé quand on ouvre le programme, permet de charger toute la carte
+    if tout is True:  # Activé quand on ouvre le programme, permet de charger toute la carte
         cases_changement = []
         for i in range(0, cellules_hauteur):
             for j in range(0, cellules_largeur):
-                cases_changement.append((i,j))
+                cases_changement.append((i, j))
 
     # Affichage des cellules sur l'application avec leur couleur respective
     for case in cases_changement:
-        j , i = case[0], case[1]
+        j, i = case[0], case[1]
         if (j, i) in dico_carte:  # Regarde si c'est une cellule vide ou si son état est connu
             if dico_carte[(j, i)][0] == 'S':
                 couleur = couleur_sortie
             elif dico_carte[(j, i)][0] == 'O':
                 couleur = couleur_obstacle
-            elif dico_carte[(j,i)][0] == 'C':
+            elif dico_carte[(j, i)][0] == 'C':
                 couleur = (255, 255, 0)
             elif dico_carte[(j, i)][0] == 'F':
                 niveau_rouge = dico_carte[(j, i)][1]
@@ -174,7 +195,7 @@ def affichage(cases_changement, tout=False):
                              pygame.Rect(i * taille_largeur, j * taille_hauteur, taille_largeur, taille_hauteur), 1)
 
 
-def verification_carte(): # Pas implémentée
+def verification_carte():  # Pas implémentée
     """Vérifie avant chaque simulation que toutes les zones sont accessibles et chaque sortie également, en laissant
     la possibilité à l'utilisateur de lancer quand même"""
 
@@ -185,7 +206,7 @@ def verification_carte(): # Pas implémentée
 def check_sortie():
     """Actualise la variable globale "sorties" """
     sorties.clear()
-    for key,item in dico_carte.items():
+    for key, item in dico_carte.items():
         if item[0] == 'S':
             sorties.append(key)
 
@@ -205,9 +226,9 @@ def determiner_dico_distance_euclidienne():
             for voisin in voisins:
                 distance_sortie = 0
                 # On regarde si c'est un voisin diagonal ou un voisin direct
-                if case[0] != voisin[0] and case[1] != voisin[1]: # Voisin diagonal
+                if case[0] != voisin[0] and case[1] != voisin[1]:  # Voisin diagonal
                     distance_sortie = dico_distance_euclidienne[case] + 1.41
-                elif case[0] != voisin[0] or case[1] != voisin[1]: # Voisin direct
+                elif case[0] != voisin[0] or case[1] != voisin[1]:  # Voisin direct
                     distance_sortie = dico_distance_euclidienne[case] + 1
                 else:
                     distance_sortie = 99999
@@ -232,18 +253,19 @@ def determiner_dico_pchs():
     for i in range(0, cellules_hauteur):
         for j in range(0, cellules_largeur):
             calcul_autorise = False
-            if (i,j) in dico_carte:
-                if dico_carte[(i,j)][0] == "F":
+            if (i, j) in dico_carte:
+                if dico_carte[(i, j)][0] == "F":
                     calcul_autorise = True
             else:
                 calcul_autorise = True
 
             if calcul_autorise is True:
-                sortie_trouve, _ = check_entourage(i,j, sorties) # Le check_entourage renvoie l'entourage dans
+                sortie_trouve, _ = check_entourage(i, j, sorties)  # Le check_entourage renvoie l'entourage dans
                 # l'ordre du plus court vers la sortie en distance euclidienne
-                chemin = [(i,j)]
+                chemin = [(i, j)]
                 while sortie_trouve[0] is False:
-                    sortie_trouve, prochain_chemin = check_entourage(chemin[len(chemin) - 1][0], chemin[len(chemin) - 1][1], sorties)
+                    sortie_trouve, prochain_chemin = check_entourage(chemin[len(chemin) - 1][0],
+                                                                     chemin[len(chemin) - 1][1], sorties)
                     if sortie_trouve[0] is False:
                         while prochain_chemin[0] in chemin:
                             prochain_chemin.pop(0)
@@ -251,7 +273,7 @@ def determiner_dico_pchs():
                 chemin.append(sortie_trouve[1])
                 chemin.pop(0)
                 chemin.reverse()
-                dico_pchs[(i,j)] = chemin
+                dico_pchs[(i, j)] = chemin
 
 
 def trier_entourage_distance_euclidienne(voisins, case_depart):
@@ -259,9 +281,9 @@ def trier_entourage_distance_euclidienne(voisins, case_depart):
     liste_triee = []
     for voisin in voisins:
         if voisin[0] != case_depart[0] and voisin[1] != case_depart[1]:
-            liste_triee.append([voisin, dico_distance_euclidienne[voisin]+1.41])
+            liste_triee.append([voisin, dico_distance_euclidienne[voisin] + 1.41])
         elif voisin[0] != case_depart[0] or voisin[1] != case_depart[1]:
-            liste_triee.append([voisin, dico_distance_euclidienne[voisin]+1])
+            liste_triee.append([voisin, dico_distance_euclidienne[voisin] + 1])
         else:
             liste_triee.append([voisin, dico_distance_euclidienne[voisin]])
     liste_triee = tri_foule(liste_triee)
@@ -283,19 +305,20 @@ def trier_entourage(voisins, case_depart):
     return liste_triee
 
 
-def determiner_cercle_maximal_effort(i,j, rayon):
+def determiner_cercle_maximal_effort(i, j, rayon):
     "Determine le cercle voisin d'un cellule d'un certain rayon donné"
-    liste_attente_future = [(i,j)]
+    liste_attente_future = [(i, j)]
     deja_vu = []
-    for _ in range(0,rayon+1):
+    for _ in range(0, rayon + 1):
         liste_attente_actuelle = [case for case in liste_attente_future]
         liste_attente_future.clear()
         for case in liste_attente_actuelle:
             deja_vu.append(case)
             voisins = check_entourage(case[0], case[1], [], distance_non_euclidienne=False)[1]
             for voisin in voisins:
-                if (voisin not in deja_vu) and (voisin not in liste_attente_actuelle) and (voisin not in liste_attente_future):
-                    if abs(voisin[0] - i)  + abs(voisin[1] - j) < 2*rayon:
+                if (voisin not in deja_vu) and (voisin not in liste_attente_actuelle) and (
+                        voisin not in liste_attente_future):
+                    if abs(voisin[0] - i) + abs(voisin[1] - j) < 2 * rayon:
                         if voisin not in dico_carte:
                             liste_attente_future.append(voisin)
 
@@ -304,7 +327,7 @@ def determiner_cercle_maximal_effort(i,j, rayon):
     return deja_vu
 
 
-def check_entourage(i, j, tableau_sortie,foule=False, distance_non_euclidienne = False):
+def check_entourage(i, j, tableau_sortie, foule=False, distance_non_euclidienne=False):
     """Cette fonction renvoie la liste de l'entourage vide de la case demandée, ou si la sortie est à proximité"""
     voisins_vides = []
     is_sortie = [False, ()]
@@ -314,28 +337,29 @@ def check_entourage(i, j, tableau_sortie,foule=False, distance_non_euclidienne =
             if l == 0 and k == 0:  # La case elle-même ne peut pas être son entourage
                 print('', end='')  # rien
             elif (l != 0) and (k != 0):  # Si c'est un coin, on vérifie qu'on puisse y accéder
-                if (i+k, j) in dico_carte:
-                    if dico_carte[(i+k, j)][0] == 'O':
+                if (i + k, j) in dico_carte:
+                    if dico_carte[(i + k, j)][0] == 'O':
                         coin_licite = False  # Coin inaccessible
-                if (i, j+l) in dico_carte:
-                    if dico_carte[(i, j+l)][0] == 'O':
+                if (i, j + l) in dico_carte:
+                    if dico_carte[(i, j + l)][0] == 'O':
                         coin_licite = False  # Coin inaccessible
             if (i + k) < 0 or (j + l) < 0:
-                coin_licite = False # Hors de la carte
+                coin_licite = False  # Hors de la carte
             if coin_licite is True:
                 if (i + k, j + l) in tableau_sortie:
                     is_sortie = [True, (i + k, j + l)]
                     return is_sortie, trier_entourage(voisins_vides, (i, j))
                 if (i + k, j + l) not in dico_carte:
                     voisins_vides.append((i + k, j + l))
-                elif dico_carte[(i + k, j + l)][0] == 'F' and foule is False:  # On ne compte pas la foule comme un obstacle
+                elif dico_carte[(i + k, j + l)][
+                    0] == 'F' and foule is False:  # On ne compte pas la foule comme un obstacle
                     voisins_vides.append((i + k, j + l))
     if distance_non_euclidienne is False:
-        return is_sortie, trier_entourage_distance_euclidienne(voisins_vides, (i, j)) # très instable
+        return is_sortie, trier_entourage_distance_euclidienne(voisins_vides, (i, j))  # très instable
     return is_sortie, trier_entourage(voisins_vides, (i, j))
 
 
-def pchs(i, j, tab_sortie,foule_as_obstacle=False):  # (Plus Court Chemin vers Sortie)
+def pchs(i, j, tab_sortie, foule_as_obstacle=False):  # (Plus Court Chemin vers Sortie)
     """Calcul pour chaque foule le plus court chemin en utilisant un parcours en largeur"""
     file_attente = [(i, j)]
     deja_vu = []
@@ -346,19 +370,19 @@ def pchs(i, j, tab_sortie,foule_as_obstacle=False):  # (Plus Court Chemin vers S
     # pour une case, puis on vérifie qu'il marche toujours.
 
     chemin_libre = True
-    if (i,j) in dico_memoisation_chemin and foule_as_obstacle is False and tab_sortie == sorties:
-        for case in dico_memoisation_chemin[(i,j)]:
+    if (i, j) in dico_memoisation_chemin and foule_as_obstacle is False and tab_sortie == sorties:
+        for case in dico_memoisation_chemin[(i, j)]:
             if case in dico_carte:
                 if dico_carte[(case[0], case[1])][0] != "F" and dico_carte[(case[0], case[1])][0] != "S":
-                    del dico_memoisation_chemin[(i,j)]
+                    del dico_memoisation_chemin[(i, j)]
                     chemin_libre = False
         if chemin_libre == True:
-            return dico_memoisation_chemin[(i,j)]
+            return dico_memoisation_chemin[(i, j)]
 
     # Début de l'algorithme de parcours en largeur
     while sortie is False:
 
-        if len(file_attente) == 0: # Dans le cas ou on a déjà parcourue toute la carte
+        if len(file_attente) == 0:  # Dans le cas ou on a déjà parcourue toute la carte
             if foule_as_obstacle is True:
                 return deja_vu, False
             print("Problème dans le calcul du chemin de la foule, sortie introuvable")
@@ -366,7 +390,8 @@ def pchs(i, j, tab_sortie,foule_as_obstacle=False):  # (Plus Court Chemin vers S
         else:
             deja_vu.append(file_attente[0])
 
-        is_sortie, voisins = check_entourage(file_attente[0][0], file_attente[0][1], tab_sortie,foule=foule_as_obstacle)
+        is_sortie, voisins = check_entourage(file_attente[0][0], file_attente[0][1], tab_sortie,
+                                             foule=foule_as_obstacle)
         if is_sortie[0] is True:  # Est-ce qu'on a trouvé la sortie ?
             sortie = True
             coord_sortie = is_sortie[1]
@@ -420,14 +445,14 @@ def str_to_tuple(ligne, type):
 
 def ajout_foule(i, j):
     """Cette fonction s'occupe de repartir la foule sur le point mentionné lors du mode edition"""
-    liste_foule_ajoutee = [] # Tableau contenant toutes les cases de foule générées pour la fonction affichage
+    liste_foule_ajoutee = []  # Tableau contenant toutes les cases de foule générées pour la fonction affichage
     for k in range(-portee_ajout_foule + 1, portee_ajout_foule):
         for l in range(-portee_ajout_foule + 1, portee_ajout_foule):
             if (i + k, j + l) not in dico_carte:
                 if randrange(0, valeur_absolu(k) + 1) == 0:
                     dico_carte[(i + k, j + l)] = ["F", 1]
-                    liste_foule_ajoutee.append([i+k, j+ l])
-            #FONCTIONNALITEE A REMETTRE
+                    liste_foule_ajoutee.append([i + k, j + l])
+            # FONCTIONNALITEE A REMETTRE
             """elif dico_carte[(i + k, j + l)][0] == "F" and randrange(0, valeur_absolu(k) + 1) == 0:
                 if dico_carte[(i + k, j + l)][1] != 4:
                     dico_carte[(i + k, j + l)][1] += 1
@@ -460,7 +485,7 @@ def ouvrir_carte():
             if int(ligne[0]) != cellules_largeur or int(ligne[1]) != cellules_hauteur:
                 print("Mauvaise dimension des cellules")
         #######
-        else: # C'est les bonnes dimensions, on charge la carte
+        else:  # C'est les bonnes dimensions, on charge la carte
             ligne = ligne.split(";")
             dico_carte[str_to_tuple(ligne[0], 'int')] = str_to_tuple(ligne[1], str)
     fichier.close()
@@ -480,10 +505,10 @@ def modifier_carreau(x, y):
         ajout_foule(i, j)
     else:
         if (i, j) in dico_carte:
-            dico_carte.pop((i,j))
+            dico_carte.pop((i, j))
         else:
             print("Erreur, il n'y a rien a faire sur cette cases")
-    affichage([[i,j]])
+    affichage([[i, j]])
 
 
 def edition(lettre):
@@ -518,7 +543,7 @@ def edition(lettre):
             if autorisation is True:  # Aucun autre mode n'est activé, on peut donc l'activer ou le désactiver
                 if bool_edition[numero_lettre[lettre]] is True:
                     bool_edition[numero_lettre[lettre]] = False
-                    print(f"Mode ajout {numero_lettre[lettre]} desactivé")
+                    print(f"Mode ajout {numero_lettre[lettre]} désactivé")
                 else:
                     bool_edition[numero_lettre[lettre]] = True
                     print(f"Mode ajout {numero_lettre[lettre]} active")
@@ -531,15 +556,13 @@ def deplacement_foule(i, j, distance_sortie):
     chemin_sortie = pchs(i, j, sorties)
     cercle_effort = determiner_cercle_maximal_effort(i, j, distance_maximale_effort)
 
-    chemin_inverse = pchs(chemin_sortie[0][0], chemin_sortie[0][1] , cercle_effort)
-
+    chemin_inverse = pchs(chemin_sortie[0][0], chemin_sortie[0][1], cercle_effort)
     chemin_sans_sortie, est_sortie = pchs(i, j, [(chemin_inverse[0][0], chemin_inverse[0][1])], foule_as_obstacle=True)
-
     est_sortie, _ = check_entourage(i, j, sorties)
 
-    if est_sortie[0] is True:
+    if est_sortie[0] is True:  # Si la sortie est dans l'entourage, la future case est donc la sortie
         chemin = [est_sortie[1]]
-    else:
+    else:  # Sinon,
         chemin = []
         for case in chemin_sans_sortie:
             chemin.append(case)
@@ -549,19 +572,10 @@ def deplacement_foule(i, j, distance_sortie):
         if future_case not in dico_carte:
             dico_carte[future_case] = dico_carte[(i, j)]
             del dico_carte[(i, j)]
-
-        #FONCTIONNALITEE A REMETTRE
-        #elif dico_carte[future_case][0] == 'F':
-        #      if dico_carte[future_case][1] + dico_carte[(i, j)][1] <= 5:  # Quand deux foules peuvent se combiner
-        #          dico_carte[future_case][1] = dico_carte[future_case][1] + dico_carte[(i, j)][1]
-        #          del dico_carte[(i, j)]
-        #      elif dico_carte[future_case][1] != 5:  # Quand seulement une partie de la foule peut se combiner
-        #          dico_carte[(i, j)][1] -= 5 - dico_carte[future_case][1]
-        #          dico_carte[future_case][1] = 5
         elif dico_carte[future_case][0] == 'S':  # Quand il atteint la sortie on le supprime
             del dico_carte[(i, j)]
         elif dico_carte[future_case][0] == 'F':
-            print('', end='') # A fixer, c'est quand deux foules s'emboitent
+            print('', end='')  # A fixer, c'est quand deux foules s'emboitent
         else:
             print("Problème dans le déplacement d'une case foule")
     affichage([[i, j], future_case])
@@ -580,7 +594,7 @@ check_sortie()
 determiner_dico_distance_euclidienne()
 determiner_dico_pchs()
 affichage_console()  # Affichage du menu
-affichage([[0,0]],tout=True) # On affiche toute la carte pour la charger
+affichage([[0, 0]], tout=True)  # On affiche toute la carte pour la charger
 while 1:
     for event in pygame.event.get():
         # print(event)
@@ -600,7 +614,7 @@ while 1:
             if event.key == 13:  # entrer
                 if demarrer_simulation is False:
                     if bool_edition['edition'] is False:
-                        #verification_carte()
+                        # verification_carte()
                         demarrer_simulation = True
                         print("Simulation démarrée!")
                         nombre_tours_simulation = 0
@@ -628,12 +642,13 @@ while 1:
             demarrer_simulation is True):  # Pour afficher un déplacement par pas de temps
         temps_ancien_deplacement = horloge
         dico_chemin.clear()
-        liste_foule_a_deplacer = []# Liste chacun des 'carrés' foule à faire bouger
+        liste_foule_a_deplacer = []  # Liste chacun des 'carrés' foule à faire bouger, boucle imbriquée pour obtenir les
+        # cordonnées de toutes les cases foule
         for i in range(0, cellules_hauteur):
             for j in range(0, cellules_largeur):
-                if (i,j) in dico_carte:
+                if (i, j) in dico_carte:
                     if dico_carte[(i, j)][0] == 'F':
-                        liste_foule_a_deplacer.append((i,j))
+                        liste_foule_a_deplacer.append((i, j))
         if len(liste_foule_a_deplacer) == 0:
             print(f"Nombre de tours : {nombre_tours_simulation}")
             print("Simulation terminée!")
@@ -642,13 +657,14 @@ while 1:
 
         # On calcule la distance de chaque case foule avec la sortie, puis on le range par ordre croissant
         # On peut se permettre de faire un parcours en largeur de chaque foule juste pour connaître la distance
-        # avec la sortie, car ce calcul est mémoîsé.
-        for k in range(0,len(liste_foule_a_deplacer)):
+        # avec la sortie, car ce calcul a déjà été fait, il est mémoîsé.
+        for k in range(0, len(liste_foule_a_deplacer)):
             case = liste_foule_a_deplacer[k]
-            liste_foule_a_deplacer[k] = [(case[0], case[1]), distance_euclidienne(case[0], case[1], dico_pchs[(case[0], case[1])])]
-        #Trie
-        liste_foule_a_deplacer =  tri_foule(liste_foule_a_deplacer)
-        # Puis on deplace
+            liste_foule_a_deplacer[k] = [(case[0], case[1]),
+                                         distance_euclidienne(case[0], case[1], dico_pchs[(case[0], case[1])])]
+        # On trie selon les cases foule les plus proches de la sortie
+        liste_foule_a_deplacer = tri_foule(liste_foule_a_deplacer)
+        # Puis on les déplace
         for case in liste_foule_a_deplacer:
             deplacement_foule(case[0][0], case[0][1], case[1])
 
