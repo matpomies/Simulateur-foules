@@ -1,37 +1,43 @@
-# https://github.com/sauvajohnz
 import sys
 import pygame
 from random import randrange
 import time
 #import matplotlib.pyplot as plt
 
+
+#----------------------------------------------------------------------
+# Auteur: https://github.com/sauvajohnz
+# Programme réalisé pour un TIPE sur les mouvements de foule
+#----------------------------------------------------------------------
+
+
+#-------------------------------------------------------------------------------------------------------------------
 # To do:
-# -Calcul avant puis possibilité de visionner avec un curseur
-# -Stockage des mouvements pour revisionnage dans un fichier
-# -Possibilité de changer l'algorithme de déplacement de foule
-# -Mettre graphiquement les menu d'édition au lieu de la console
-# -Mettre une console dans le menu graphique pour les erreurs
-# -Mode edition maintenant par clic continu
-# -Remettre en fonction l'affichage du chemin de la foule
-# -implémenter densite_maximale_supportee
-# -Densité maximale par rapport aux voisins (si la moyenne des voisins est en dessous de 70%, on a pas le droit d'avoir une foule>80%)
-# -Vérification de la carte avant le lancement d'une simulation
-# -Faire la somme des voisins où le déplacement est disponible pour une répartition de la densitée !
-# -Crash quand une foule n'a pas accès a la sortie
-# -Ne pas faire planter le programme quand il y a un problème de statistique
-# -Graphique des statistiques de la simulation (fonction qui gère les stats, faire un espace de variables a part)
+
+#######-> A faire directement#######
+#   [ ] Graphique des statistiques de la simulation (fonction qui gère les stats, faire un espace de variables a part)
+#------------------------------------
+
+#   [ ] Calcul avant puis possibilité de visionner avec un curseur
+#   [ ] Stockage des mouvements pour revisionnage dans un fichier
+#   [ ] Possibilité de changer l'algorithme de déplacement de foule
+#   [ ] Mettre graphiquement le menu d'édition au lieu de la console
+#   [ ] Mettre une console dans le menu graphique pour les erreurs
+#   [ ] Mode edition maintenant par clic continu
+#   [ ] Remettre en fonction l'affichage du chemin de la foule
+#   [ ] Vérification de la carte avant le lancement d'une simulation
+#   [ ] Crash quand une foule n'a pas accès a la sortie
+#   [ ] Ne pas faire planter le programme quand il y a un problème de statistique
 #       * Histogramme du nombre de case d'une certaine densitée (0 à 10 .. etc)
 #       * Image avec les cases les plus affluentes
-# -Possibilité de faire une série de tests prédeterminés sur une carte (avec les paramètres dans un fichier)
-# -Faire un pdf avec toutes les statistiques expliquées généré automatiquement (tableau de graphiques)
-# -Si deux cases ont la même distance, on doit choisir au hasard. (fonction hasard a mettre + tard)
-# -Choisir un algorithme de densité pour le pourcentage autorisé a quitter la case (linéaire? dépend des voisins?)
+#   [ ] Possibilité de faire une série de tests prédeterminés sur une carte (avec les paramètres dans un fichier)
+#   [ ] Faire un pdf avec toutes les statistiques expliquées généré automatiquement (tableau de graphiques)
+#-------------------------------------------------------------------------------------------------------------------
 
 
-########################### CONSTANTES MODIFIABLES ########################################
-
-## Modification de la carte ##
-
+#----------------------------------------------------------------------
+# Modification de la carte
+#----------------------------------------------------------------------
 # width : largeur de la fenêtre en pixel
 # height : hauteur de la fenêtre en pixel
 size = width, height = 800, 500
@@ -41,7 +47,9 @@ size = width, height = 800, 500
 cellules_hauteur = 25
 cellules_largeur = 40
 
-## Modification du comportement du programme ##
+#----------------------------------------------------------------------
+# Modification du comportement du programme
+#----------------------------------------------------------------------
 
 # portee_ajout_foule : portée en case de l'ajout de foule (pour ajouter beaucoup de cases foule rapidement)
 portee_ajout_foule = 4
@@ -50,31 +58,20 @@ portee_ajout_foule = 4
 slot = "cartes/Slot_densite1.txt"
 
 # seconde_par_deplacement : temps en seconde à attendre au minimum entre chaque tour
-seconde_par_deplacement = 0.5
-
-# distance_maximale_effort : cercle maximal de déplacement d'une case foule (sur un seul tour) (OBSOLETE)
-distance_maximale_effort = 0
-
-# coef_deplacement_densite : coefficient de densité maximale autorisée à se déplacer de chaque case par tour
-coef_deplacement_densite = 0.0005
-
-# foule_pourcentage_depart : densité de foule lorsqu'on place une nouvelle case foule
-foule_pourcentage_depart = 0.5
-
-# densite_maximale_supportee : si la densite d'une case est superieure a cette valeure, la case va essayer de se
-# scinder pour diminuer sa propre densité
-densite_maximale_supportee = 0.2
+seconde_par_deplacement = 0.4
 
 # densite_sortie_imposee : La densitée autorisée à se déplacer est fixée par une fonction, si mis sur True
 # ignore la densitée calculée, et impose la valeur choisie pour sortir de la piece
 densite_sortie_imposee = True
-densite_sortie = 0.1
 
-###########################################################################################
-
-
-# Constantes a ne pas toucher
+#----------------------------------------------------------------------
+# Constantes à ne pas toucher
+#----------------------------------------------------------------------
 pygame.init()
+densite_maximale_supportee = 0
+densite_sortie = 0.
+foule_pourcentage_depart = 0
+coef_deplacement_densite = []
 dico_carte = {}  # Ce dictionnaire contient les informations de toutes les cellules et de leur état
 dico_distance_euclidienne = {}
 dico_pchs = {}
@@ -99,8 +96,9 @@ bool_edition = {
 demarrer_simulation = False
 affichage_chemin = False
 
-
-##############################
+#----------------------------------------------------------------------
+# Début du programme
+#----------------------------------------------------------------------
 
 
 def affichage_console():
@@ -122,15 +120,15 @@ def affichage_console():
                 print(f"    {item[1]} : {item[0]}")
 
 
-"""def calcul_statistiques(fin=False):
-    "A chaque tour de simulation, calcul les statistiques du tour afin d'exploiter les donnés. Le mot clé fin correspond
+def calcul_statistiques(fin=False):
+    """A chaque tour de simulation, calcul les statistiques du tour afin d'exploiter les donnés. Le mot clé fin correspond
     à la fin de la simulation, le programme met en forme les données sous forme de tableau ou de pdf et vide les variables
-    utiles aux statistiques"
+    utiles aux statistiques"""
 
     # Variables temporaires pour les statistiques
     nombre_case_foule = 0
     densite_total = 0
-
+    """
     if fin is True:  # Si la simulation est terminée
         tours = [i for i in range(0, nombre_tours_simulation)]
         plt.plot(tours, densite_moyenne_tour)
@@ -148,26 +146,44 @@ def affichage_console():
     # Pour éviter de diviser par 0 lorsque que une simulation est lancée alors qu'il n'y a pas de case foule
     if nombre_case_foule > 0:
         moyenne_densite = (densite_total / nombre_case_foule) * 100
-        densite_moyenne_tour.append(moyenne_densite)
-"""
+        densite_moyenne_tour.append(moyenne_densite)"""
+
+
+
+def importer_parametres():
+    """Importe les paramètres du programme"""
+    densite_maximale_supportee, foule_pourcentage_depart, densite_sortie = 0, 0, 0 # Initialisation des variables pour les parametres
+    with open("parametres.txt", "r") as fichier:
+        lignes = fichier.readlines()
+        # On récupère d'abord les valeurs de deplacement_densite
+        tableau_deplacement_densite = []
+        for valeur in lignes[0].split(","):
+            # On ne veut pas prendre en compte le saut d'espace dans la dernière variable
+            if valeur[len(valeur)-1] == "n":
+                valeur = valeur[:-2]
+            tableau_deplacement_densite.append(float(valeur))
+        # Ensuite on importe les autres variables
+        lignes.pop(0)
+        for ligne in lignes:
+            ligne = ligne.split(':')
+            if ligne[0] == "densite_maximale_supportee":
+                densite_maximale_supportee = float(ligne[1].split("\n")[0])
+            elif ligne[0] == "foule_pourcentage_depart":
+                foule_pourcentage_depart = float(ligne[1].split("\n")[0])
+            elif ligne[0] == "densite_sortie":
+                densite_sortie = float(ligne[1].split("\n")[0])
+            else:
+                print("Erreur dans l'importation des paramètres : paramètre inconnus")
+        return tableau_deplacement_densite, densite_maximale_supportee, foule_pourcentage_depart, densite_sortie
+
 
 def calcul_densite(voisins):
-    """Calcul la densité autorisé à transiter pour une case lors d'un tour"""
+    """Calcul la densité totale des voisins autour d'une case"""
     somme_densite = 0  # Somme des densités des voisins
     for voisin in voisins:
         if voisin in dico_carte:
             somme_densite += dico_carte[voisin][1]
-    # somme_densite prend la valeur 800 dans le cas où tous les voisins ont une densité à 100% et 0 dans le cas inverse
-    # Si on procède linéairement:
-    densite_autorise = (810 - somme_densite) * coef_deplacement_densite
-
-    # On doit absolument retourner un nombre entre 1 et 0
-    if densite_autorise >= 1:
-        return 1
-    elif densite_autorise <= 0:
-        return 0
-    else:
-        return densite_autorise
+    return somme_densite*100
 
 
 def fusion(gauche, droite):
@@ -547,7 +563,7 @@ def enregistrer_carte(dico):
     fichier.write(f"Size_window={width};{height}")
     fichier.write(f"\nSize_tiles={cellules_largeur};{cellules_hauteur}")
     for key, item in dico.items():
-        fichier.write(f"\n{key};{item}")
+        fichier.write(f"\n{key};{[item[0], round(item[1],3)]}")
     fichier.close()
 
 
@@ -636,55 +652,77 @@ def deplacement_foule(i, j, oui):
     """Déplace les cases foule"""
     est_sortie, entourage = check_entourage(i, j, sorties)
 
-    pourcentage_depart = calcul_densite(entourage)
-    if pourcentage_depart > dico_carte[i, j][1]:
-        pourcentage_depart = dico_carte[i, j][1]
-    pourcentage_restant = pourcentage_depart
+    # On calcule le taux de densité qui peut se déplacer
+    densite_depart = coef_deplacement_densite[int(calcul_densite(entourage))]
 
-    if est_sortie[0] == True:  # Si la sortie est a proximité, on va directement se diriger à l'intérieur
+    # Si on peut déplacer plus de densité que la case en contient
+    if densite_depart > dico_carte[i, j][1]:
+        densite_depart = dico_carte[i, j][1]
+    densite_deplacable = densite_depart
+
+    if est_sortie[0] == True:  # Si la sortie est à proximité, on va directement se diriger à l'intérieur
         if densite_sortie_imposee is True:
             pourcentage_sortie = densite_sortie
         else:
-            pourcentage_sortie = pourcentage_restant
+            pourcentage_sortie = densite_deplacable
 
         if dico_carte[(i, j)][1] <= pourcentage_sortie:
             del dico_carte[(i, j)]
         else:
             dico_carte[(i, j)][1] -= pourcentage_sortie
         affichage([[i, j]])
-    else:
-        # On sépare les voisins en deux catégories, les voisins ou il n'y a pas de foule, et les voisins ou il y a de
-        # la foule puis on classe tous les voisins selon leur distance a la sortie, on prend donc en priorité une
-        # case vide proche de la sortie
+    else: # Si la sortie n'est pas à proximité
+        # On détermine tous les voisins qui sont plus proches de la sortie que la case actuelle, puis on répartit selon
+        # les paramètres du programme la densité sur ces voisins.
+
         voisins = []
-        voisins_vides = []
+        # Les voisins ici, sont les voisins qui sont plus proches de la sortie que la case elle-même
         for voisin in entourage:
-            # Si la case voisine est plus proche de la sortie, on la considère comme un vrai voisin
             if dico_distance_euclidienne[voisin] < dico_distance_euclidienne[(i, j)]:
-                if voisin in dico_carte:
-                    voisins.append([voisin, dico_distance_euclidienne[voisin]])
-                else:
-                    voisins_vides.append([voisin, dico_distance_euclidienne[voisin]])
+                voisins.append([voisin, dico_distance_euclidienne[voisin]])
 
-        # S'il y a des voisins vides, on répartit équitablement toute la densité disponible entre eux
-        if len(voisins_vides) != 0:
-            voisins_vides = tri_foule(voisins_vides)
-            for voisin in voisins_vides:
-                dico_carte[voisin[0]] = ['F', pourcentage_restant / len(voisins_vides)]
-                pourcentage_restant = 0
-        else:  # Sinon, on répartit équitablement entre les autres cases
-            voisins = tri_foule(voisins)
+        # On calcule la densité totale libre des voisins
+        densite_totale_libre_voisins = 0
+        for voisin in voisins:
+            if voisin[0] in dico_carte:
+                densite_totale_libre_voisins += (1 - dico_carte[voisin[0]][1])
+            else:
+                densite_totale_libre_voisins += 1
+
+        # Si la densité qui peut se déplacer est plus grande que la densité totale libre, des voisins, on déplace le maximum possible
+        if densite_deplacable >= densite_totale_libre_voisins:
             for voisin in voisins:
-                if pourcentage_restant != 0:  # Si le voisin est plus proche de la sortie
-                    if (1 - dico_carte[voisin[0]][1]) >= pourcentage_restant:  # on peut se déplacer dans toute la case suivante
-                        dico_carte[voisin[0]][1] += pourcentage_restant
-                        pourcentage_restant = 0
-                    else: # Sinon on déplace la densitée disponible
-                        place = (1 - dico_carte[voisin[0]][1])
-                        dico_carte[voisin[0]][1] += place
-                        pourcentage_restant -= place
+                dico_carte[voisin[0]] = ['F', 1]
+            dico_carte[(i,j)][1] -= densite_totale_libre_voisins
+            if dico_carte[(i,j)][1] < 0:
+                print("Erreur de densité lors du déplacement d'une case")
+        else: # Si on peut déplacer toute la densité dans les voisins, on le fait progressivement
+            dico_carte[(i,j)][1] -= densite_deplacable
+            voisins = tri_foule(voisins) # On trie les voisins pour remplir ceux plus proche de la sortie d'abord
+            densite_tolere_locale = densite_maximale_supportee # On crée une densité tolérée locale, car dans certains cas, on l'augmente
+            while densite_deplacable > 0:
+                round(densite_deplacable, 4)
+                for voisin in voisins:
+                    if densite_deplacable > 0: # Sécurité si jamais on déplace trop dans un même tour de boucle while
+                        # On récupère la densité du voisin
+                        if voisin[0] in dico_carte:
+                            densite_voisin = dico_carte[voisin[0]][1]
+                        else:
+                            densite_voisin = 0
 
-        dico_carte[(i, j)][1] -= (pourcentage_depart - pourcentage_restant)
+                        if densite_voisin < densite_tolere_locale: # Si on peut déplacer une densité dans ce voisin
+                            densiter_a_deplacer = densite_tolere_locale - densite_voisin
+
+                            # Si l'espace disponible est plus grand que l'espace requis
+                            if densite_deplacable <= densiter_a_deplacer:
+                                densiter_a_deplacer = densite_deplacable
+                            densite_deplacable -= densiter_a_deplacer
+                            # Ensuite on actualise les données des cases
+                            if voisin[0] in dico_carte:
+                                dico_carte[voisin[0]][1] += densiter_a_deplacer
+                            else:
+                                dico_carte[voisin[0]] = ['F', densiter_a_deplacer]
+                densite_tolere_locale += 0.01
 
         if dico_carte[(i, j)][1] == 0:
             del dico_carte[i, j]
@@ -694,8 +732,6 @@ def deplacement_foule(i, j, oui):
         # Cette partie du code regroupe tous les voisins dans un tableau, afin d'actualiser l'affichage de ceux-ci
         for k in range(0, len(voisins)):
             voisins[k] = voisins[k][0]
-        for k in range(0, len(voisins_vides)):
-            voisins.append(voisins_vides[k][0])
         voisins.append([i, j])
         affichage(voisins)
 
@@ -708,6 +744,8 @@ def afficher_chemin(i, j):
     affichage(dico_chemin)
 
 
+# On importe les paramètres du programme
+coef_deplacement_densite, densite_maximale_supportee, foule_pourcentage_depart, densite_sortie = importer_parametres()
 ouvrir_carte()  # On charge le dictionnaire qui contient les informations des cases de la carte
 check_sortie()  # On charge les sorties
 determiner_dico_distance_euclidienne()  # On charge le dictionnaire des distances euclidienne
@@ -756,21 +794,19 @@ while 1:
         dico_chemin.clear()
         liste_foule_a_deplacer = []  # Liste chacun des 'carrés' foule à faire bouger, boucle imbriquée pour obtenir les
         # cordonnées de toutes les cases foule
-        moyenne = 0  # Variable pour la valeur moyenne de densité durant le tour
         total = 0
         for i in range(0, cellules_hauteur):
             for j in range(0, cellules_largeur):
                 if (i, j) in dico_carte:
                     if dico_carte[(i, j)][0] == 'F':
                         # On arrondi la densité au centième près, et si l'arrondi est 0, on supprime cette foule
-                        dico_carte[(i, j)][1] = round(dico_carte[(i, j)][1], 3)
+
+                        dico_carte[(i, j)][1] = round(dico_carte[(i, j)][1], 5)
                         if dico_carte[(i, j)][1] == 0:
                             del dico_carte[(i, j)]
                             affichage([(i, j)])
                         else:
-                            total += dico_carte[(i,j)][1]
                             liste_foule_a_deplacer.append((i, j))
-        print(total)
         if len(liste_foule_a_deplacer) == 0:
             print(f"Nombre de tours : {nombre_tours_simulation}")
             print("Simulation terminée!")
